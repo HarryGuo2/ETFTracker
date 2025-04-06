@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}{{ index[1] }} - Market Index Details{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <h1>{{ index[1] }} <small class="text-muted">({{ index[0] }})</small></h1>
+            
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="mb-0">Index Details</h4>
+                        </div>
+                        <div class="card-body">
+                            <table class="table">
+                                <tr>
+                                    <th>Number of Contributors:</th>
+                                    <td>{{ index[2] or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Launch Date:</th>
+                                    <td>{{ index[3] or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Base Value:</th>
+                                    <td>${{ "%.2f"|format(index[4]) if index[4] else 'N/A' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if etfs and etfs|length > 0 %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3>ETFs Tracking This Index</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Name</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for etf in etfs %}
+                        <tr>
+                            <td><a href="{{ url_for('etf_details', etf_ticker=etf[0]) }}">{{ etf[0] }}</a></td>
+                            <td>{{ etf[1] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if stocks and stocks|length > 0 %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3>Stocks in This Index</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Name</th>
+                            <th>Weight</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stock in stocks %}
+                        <tr>
+                            <td><a href="{{ url_for('stock_details', stock_ticker=stock[0]) }}">{{ stock[0] }}</a></td>
+                            <td>{{ stock[1] }}</td>
+                            <td>{{ "%.2f"|format(stock[2]) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if not etfs or etfs|length == 0 and not stocks or stocks|length == 0 %}
+    <div class="alert alert-info mt-4">
+        No ETFs or stocks found for this index.
+    </div>
+    {% endif %}
+    
+    <div class="mt-4">
+        <a href="{{ url_for('list_indexes') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Indexes
+        </a>
+    </div>
+</div>
+{% endblock %} 

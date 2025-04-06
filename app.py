@@ -1,7 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 import psycopg2
 import os
 import traceback
+from datetime import datetime
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -18,6 +21,10 @@ DB_USER = "hg2736"
 DB_PASSWORD = "008096"  # Correct password from CountRecords.py
 DB_SCHEMA = "hg2736"
 
+# Session configuration
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
+
 def get_db_connection():
     conn = psycopg2.connect(
         host=DB_HOST,
@@ -28,6 +35,16 @@ def get_db_connection():
     )
     conn.set_session(autocommit=True)
     return conn
+
+# Authentication decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please login to access this page.')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/')
 def index():
@@ -67,17 +84,34 @@ def list_etfs():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("""
-            SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name as fund_family
-            FROM ETF e
-            JOIN Fund_has_ETF fe ON e.etf_ticker = fe.etf_ticker
-            JOIN Fund_Family f ON fe.fund_id = f.fund_id
-            ORDER BY e.etf_ticker
-        """)
+        
+        # Get search parameter if any
+        search_query = request.args.get('q', '')
+        
+        if search_query:
+            # If search query provided, filter results
+            cur.execute("""
+                SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name as fund_family
+                FROM ETF e
+                JOIN Fund_has_ETF fe ON e.etf_ticker = fe.etf_ticker
+                JOIN Fund_Family f ON fe.fund_id = f.fund_id
+                WHERE e.etf_ticker ILIKE %s OR e.etf_name ILIKE %s
+                ORDER BY e.etf_ticker
+            """, ('%' + search_query + '%', '%' + search_query + '%'))
+        else:
+            # If no search query, return all
+            cur.execute("""
+                SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name as fund_family
+                FROM ETF e
+                JOIN Fund_has_ETF fe ON e.etf_ticker = fe.etf_ticker
+                JOIN Fund_Family f ON fe.fund_id = f.fund_id
+                ORDER BY e.etf_ticker
+            """)
+            
         etfs = cur.fetchall()
         cur.close()
         conn.close()
-        return render_template('etfs.html', etfs=etfs)
+        return render_template('etfs.html', etfs=etfs, search_query=search_query)
     except Exception as e:
         return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
 
@@ -116,9 +150,18 @@ def etf_details(etf_ticker):
         """, (etf_ticker,))
         stocks = cur.fetchall()
         
+        # Check if user has liked this ETF
+        is_liked = False
+        if 'user_id' in session:
+            cur.execute(
+                "SELECT 1 FROM User_Likes_ETF WHERE user_id = %s AND etf_ticker = %s",
+                (session['user_id'], etf_ticker)
+            )
+            is_liked = cur.fetchone() is not None
+        
         cur.close()
         conn.close()
-        return render_template('etf_details.html', etf=etf, sectors=sectors, stocks=stocks)
+        return render_template('etf_details.html', etf=etf, sectors=sectors, stocks=stocks, is_liked=is_liked)
     except Exception as e:
         return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
 
@@ -127,15 +170,30 @@ def list_stocks():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("""
-            SELECT s.stock_ticker, s.stock_name, s.ipo_date, s.stock_sector
-            FROM Stock s
-            ORDER BY s.stock_ticker
-        """)
+        
+        # Get search parameter if any
+        search_query = request.args.get('q', '')
+        
+        if search_query:
+            # If search query provided, filter results
+            cur.execute("""
+                SELECT s.stock_ticker, s.stock_name, s.ipo_date, s.stock_sector
+                FROM Stock s
+                WHERE s.stock_ticker ILIKE %s OR s.stock_name ILIKE %s
+                ORDER BY s.stock_ticker
+            """, ('%' + search_query + '%', '%' + search_query + '%'))
+        else:
+            # If no search query, return all
+            cur.execute("""
+                SELECT s.stock_ticker, s.stock_name, s.ipo_date, s.stock_sector
+                FROM Stock s
+                ORDER BY s.stock_ticker
+            """)
+            
         stocks = cur.fetchall()
         cur.close()
         conn.close()
-        return render_template('stocks.html', stocks=stocks)
+        return render_template('stocks.html', stocks=stocks, search_query=search_query)
     except Exception as e:
         return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
 
@@ -215,6 +273,441 @@ def debug_etf():
         })
     except Exception as e:
         return jsonify({"error": str(e), "traceback": traceback.format_exc()})
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        user_key = request.form['user_key']
+        
+        # Simple validation
+        if not username or not user_key:
+            flash('Username and password are required')
+            return render_template('register.html')
+            
+        # Hash the password
+        hashed_key = generate_password_hash(user_key)
+        
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO Users (username, user_key) VALUES (%s, %s) RETURNING user_id",
+                (username, hashed_key)
+            )
+            user_id = cur.fetchone()[0]
+            conn.commit()
+            cur.close()
+            conn.close()
+            
+            # Auto-login after registration
+            session['user_id'] = user_id
+            session['username'] = username
+            
+            flash('Registration successful! You are now logged in.')
+            return redirect(url_for('my_etfs'))
+        except Exception as e:
+            flash(f'Error: {str(e)}')
+            return render_template('register.html')
+    
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        user_key = request.form['user_key']
+        
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT user_id, user_key FROM Users WHERE username = %s", (username,))
+            user = cur.fetchone()
+            cur.close()
+            conn.close()
+            
+            if user and check_password_hash(user[1], user_key):
+                session['user_id'] = user[0]
+                session['username'] = username
+                flash('Login successful!')
+                return redirect(url_for('my_etfs'))
+            else:
+                flash('Invalid username or password')
+        except Exception as e:
+            flash(f'Error: {str(e)}')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    session.pop('username', None)
+    flash('You have been logged out.')
+    return redirect(url_for('index'))
+
+@app.route('/my-etfs')
+@login_required
+def my_etfs():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name as fund_family
+            FROM User_Likes_ETF ul
+            JOIN ETF e ON ul.etf_ticker = e.etf_ticker
+            JOIN Fund_has_ETF fe ON e.etf_ticker = fe.etf_ticker
+            JOIN Fund_Family f ON fe.fund_id = f.fund_id
+            WHERE ul.user_id = %s
+            ORDER BY ul.liked_at DESC
+        """, (session['user_id'],))
+        liked_etfs = cur.fetchall()
+        cur.close()
+        conn.close()
+        return render_template('my_etfs.html', etfs=liked_etfs)
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
+
+@app.route('/like-etf/<etf_ticker>', methods=['POST'])
+@login_required
+def like_etf(etf_ticker):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO User_Likes_ETF (user_id, etf_ticker) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+            (session['user_id'], etf_ticker)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash(f'Added {etf_ticker} to your favorites!')
+        return redirect(url_for('etf_details', etf_ticker=etf_ticker))
+    except Exception as e:
+        flash(f'Error: {str(e)}')
+        return redirect(url_for('etf_details', etf_ticker=etf_ticker))
+
+@app.route('/unlike-etf/<etf_ticker>', methods=['POST'])
+@login_required
+def unlike_etf(etf_ticker):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM User_Likes_ETF WHERE user_id = %s AND etf_ticker = %s",
+            (session['user_id'], etf_ticker)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash(f'Removed {etf_ticker} from your favorites')
+        return redirect(url_for('etf_details', etf_ticker=etf_ticker))
+    except Exception as e:
+        flash(f'Error: {str(e)}')
+        return redirect(url_for('etf_details', etf_ticker=etf_ticker))
+
+@app.route('/sectors')
+def list_sectors():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Get search parameter if any
+        search_query = request.args.get('q', '')
+        
+        if search_query:
+            # If search query provided, filter results
+            cur.execute("""
+                SELECT sector_id, sector_name, annualized_return_1yr, annualized_return_3yr, annualized_return_5yr
+                FROM Sector
+                WHERE sector_id ILIKE %s OR sector_name ILIKE %s
+                ORDER BY sector_name
+            """, ('%' + search_query + '%', '%' + search_query + '%'))
+        else:
+            # If no search query, return all
+            cur.execute("""
+                SELECT sector_id, sector_name, annualized_return_1yr, annualized_return_3yr, annualized_return_5yr
+                FROM Sector
+                ORDER BY sector_name
+            """)
+            
+        sectors = cur.fetchall()
+        cur.close()
+        conn.close()
+        return render_template('sectors.html', sectors=sectors, search_query=search_query)
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
+
+@app.route('/sector/<sector_id>')
+def sector_details(sector_id):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Get sector basic info
+        cur.execute("""
+            SELECT *
+            FROM Sector
+            WHERE sector_id = %s
+        """, (sector_id,))
+        sector = cur.fetchone()
+        
+        # Get ETFs in this sector
+        cur.execute("""
+            SELECT e.etf_ticker, e.etf_name, es.sector_weight
+            FROM ETF_has_Sector es
+            JOIN ETF e ON es.etf_ticker = e.etf_ticker
+            WHERE es.sector_id = %s
+            ORDER BY es.sector_weight DESC
+        """, (sector_id,))
+        etfs = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        return render_template('sector_details.html', sector=sector, etfs=etfs)
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
+
+@app.route('/indexes')
+def list_indexes():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Get search parameter if any
+        search_query = request.args.get('q', '')
+        
+        if search_query:
+            # If search query provided, filter results
+            cur.execute("""
+                SELECT index_ticker, index_name, number_of_contributors, launch_date, base_value
+                FROM market_index
+                WHERE index_ticker ILIKE %s OR index_name ILIKE %s
+                ORDER BY index_name
+            """, ('%' + search_query + '%', '%' + search_query + '%'))
+        else:
+            # If no search query, return all
+            cur.execute("""
+                SELECT index_ticker, index_name, number_of_contributors, launch_date, base_value
+                FROM market_index
+                ORDER BY index_name
+            """)
+            
+        indexes = cur.fetchall()
+        cur.close()
+        conn.close()
+        return render_template('indexes.html', indexes=indexes, search_query=search_query)
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
+
+@app.route('/index/<index_ticker>')
+def index_details(index_ticker):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Get index basic info
+        cur.execute("""
+            SELECT *
+            FROM market_index
+            WHERE index_ticker = %s
+        """, (index_ticker,))
+        index = cur.fetchone()
+        
+        # Get ETFs tracking this index (assuming a table exists for this relationship)
+        # Check if the etf_tracks_market_index table exists
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables 
+                WHERE table_schema = 'hg2736' AND table_name = 'etf_tracks_market_index'
+            )
+        """)
+        table_exists = cur.fetchone()[0]
+        
+        etfs = []
+        if table_exists:
+            # If the table exists, get ETFs tracking this index
+            cur.execute("""
+                SELECT e.etf_ticker, e.etf_name
+                FROM etf_tracks_market_index ei
+                JOIN ETF e ON ei.etf_ticker = e.etf_ticker
+                WHERE ei.index_ticker = %s
+            """, (index_ticker,))
+            etfs = cur.fetchall()
+        
+        # If the relationship table doesn't exist, try to get stocks in the index instead
+        if not etfs:
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_schema = 'hg2736' AND table_name = 'stock_in_index'
+                )
+            """)
+            stock_table_exists = cur.fetchone()[0]
+            
+            if stock_table_exists:
+                cur.execute("""
+                    SELECT s.stock_ticker, s.stock_name, si.weight
+                    FROM stock_in_index si
+                    JOIN Stock s ON si.stock_ticker = s.stock_ticker
+                    WHERE si.index_ticker = %s
+                    ORDER BY si.weight DESC
+                """, (index_ticker,))
+                stocks_in_index = cur.fetchall()
+                
+                cur.close()
+                conn.close()
+                return render_template('index_details.html', index=index, etfs=etfs, stocks=stocks_in_index)
+        
+        cur.close()
+        conn.close()
+        return render_template('index_details.html', index=index, etfs=etfs)
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
+
+@app.route('/recommendations')
+@login_required
+def etf_recommendations():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Get ETFs the user has liked
+        cur.execute("""
+            SELECT etf_ticker 
+            FROM User_Likes_ETF 
+            WHERE user_id = %s
+        """, (session['user_id'],))
+        
+        liked_etfs = [row[0] for row in cur.fetchall()]
+        
+        # If the user hasn't liked any ETFs yet, return an empty result
+        if not liked_etfs:
+            cur.close()
+            conn.close()
+            return render_template('recommendations.html', recommendations=[], liked_etfs=[])
+        
+        # Generate recommendations based on sector similarity
+        # For each liked ETF, find other ETFs with similar sectors
+        all_recommendations = []
+        
+        for etf_ticker in liked_etfs:
+            cur.execute("""
+                WITH user_etf_sectors AS (
+                  -- Get the sectors for the ETF the user is interested in
+                  SELECT sector_id
+                  FROM ETF_has_Sector
+                  WHERE etf_ticker = %s
+                ),
+                similar_etfs AS (
+                  -- Find other ETFs that share these sectors
+                  SELECT e.etf_ticker, e.etf_name, COUNT(*) AS common_sectors
+                  FROM ETF e
+                  JOIN ETF_has_Sector es ON e.etf_ticker = es.etf_ticker
+                  WHERE es.sector_id IN (SELECT sector_id FROM user_etf_sectors)
+                    AND e.etf_ticker <> %s
+                    AND e.etf_ticker NOT IN %s
+                  GROUP BY e.etf_ticker, e.etf_name
+                )
+                -- Get the top 5 ETFs based on the number of matching sectors
+                SELECT etf_ticker, etf_name, common_sectors
+                FROM similar_etfs
+                ORDER BY common_sectors DESC
+                LIMIT 5
+            """, (etf_ticker, etf_ticker, tuple(liked_etfs) if liked_etfs else ('',)))
+            
+            recommendations = cur.fetchall()
+            
+            # Add the source ETF to each recommendation
+            recommendations_with_source = [(etf_ticker, rec[0], rec[1], rec[2]) for rec in recommendations]
+            all_recommendations.extend(recommendations_with_source)
+        
+        # Get ETF details for the liked ETFs to display
+        liked_etfs_details = []
+        if liked_etfs:
+            placeholders = ','.join(['%s'] * len(liked_etfs))
+            cur.execute(f"""
+                SELECT etf_ticker, etf_name
+                FROM ETF
+                WHERE etf_ticker IN ({placeholders})
+            """, tuple(liked_etfs))
+            liked_etfs_details = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        # Sort the recommendations by the number of common sectors
+        sorted_recommendations = sorted(all_recommendations, key=lambda x: x[3], reverse=True)
+        
+        # Limit to a unique set of top 10 recommendations
+        unique_recommendations = []
+        seen_etfs = set()
+        for rec in sorted_recommendations:
+            if rec[1] not in seen_etfs:
+                seen_etfs.add(rec[1])
+                unique_recommendations.append(rec)
+                if len(unique_recommendations) >= 10:
+                    break
+        
+        return render_template('recommendations.html', 
+                              recommendations=unique_recommendations, 
+                              liked_etfs=liked_etfs_details)
+                              
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
+
+# Add a route to get recommendations for a specific ETF
+@app.route('/recommendations/<etf_ticker>')
+def etf_specific_recommendations(etf_ticker):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Get the ETF details
+        cur.execute("""
+            SELECT *
+            FROM ETF
+            WHERE etf_ticker = %s
+        """, (etf_ticker,))
+        source_etf = cur.fetchone()
+        
+        if not source_etf:
+            return f"<h1>Error</h1><p>ETF with ticker {etf_ticker} not found</p>"
+        
+        # Generate recommendations based on sector similarity
+        cur.execute("""
+            WITH source_etf_sectors AS (
+              -- Get the sectors for the source ETF
+              SELECT sector_id
+              FROM ETF_has_Sector
+              WHERE etf_ticker = %s
+            ),
+            similar_etfs AS (
+              -- Find other ETFs that share these sectors
+              SELECT e.etf_ticker, e.etf_name, COUNT(*) AS common_sectors
+              FROM ETF e
+              JOIN ETF_has_Sector es ON e.etf_ticker = es.etf_ticker
+              WHERE es.sector_id IN (SELECT sector_id FROM source_etf_sectors)
+                AND e.etf_ticker <> %s
+              GROUP BY e.etf_ticker, e.etf_name
+            )
+            -- Get the top ETFs based on the number of matching sectors
+            SELECT etf_ticker, etf_name, common_sectors
+            FROM similar_etfs
+            ORDER BY common_sectors DESC
+            LIMIT 5
+        """, (etf_ticker, etf_ticker))
+        
+        recommendations = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        return render_template('specific_recommendations.html', 
+                              recommendations=recommendations, 
+                              source_etf=source_etf)
+                              
+    except Exception as e:
+        return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8111) 

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{{ sector[1] }} - Sector Details{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <h1>{{ sector[1] }}</h1>
+            <div class="card mt-3">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Performance</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h5>1 Year Return</h5>
+                            <p class="display-6 {% if sector[2] >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ "%.2f"|format(sector[2]) }}%
+                            </p>
+                        </div>
+                        <div class="col-md-4">
+                            <h5>3 Year Return</h5>
+                            <p class="display-6 {% if sector[3] >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ "%.2f"|format(sector[3]) }}%
+                            </p>
+                        </div>
+                        <div class="col-md-4">
+                            <h5>5 Year Return</h5>
+                            <p class="display-6 {% if sector[4] >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ "%.2f"|format(sector[4]) }}%
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3>ETFs in this Sector</h3>
+            {% if etfs %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Name</th>
+                                <th>Weight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for etf in etfs %}
+                            <tr>
+                                <td><a href="{{ url_for('etf_details', etf_ticker=etf[0]) }}">{{ etf[0] }}</a></td>
+                                <td>{{ etf[1] }}</td>
+                                <td>{{ "%.2f"|format(etf[2]) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">No ETFs found in this sector.</div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('list_sectors') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Sectors
+        </a>
+    </div>
+</div>
+{% endblock %} 

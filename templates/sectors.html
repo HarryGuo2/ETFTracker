@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Sectors{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Sectors</h1>
+    
+    <!-- Search Form -->
+    <form class="mb-4" method="get" action="{{ url_for('list_sectors') }}">
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="Search sectors..." name="q" value="{{ search_query }}">
+            <button class="btn btn-primary" type="submit">
+                <i class="bi bi-search"></i> Search
+            </button>
+            {% if search_query %}
+            <a href="{{ url_for('list_sectors') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-x-circle"></i> Clear
+            </a>
+            {% endif %}
+        </div>
+    </form>
+    
+    {% if sectors %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Sector ID</th>
+                        <th>Name</th>
+                        <th>1 Year Return</th>
+                        <th>3 Year Return</th>
+                        <th>5 Year Return</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sector in sectors %}
+                    <tr>
+                        <td>{{ sector[0] }}</td>
+                        <td><a href="{{ url_for('sector_details', sector_id=sector[0]) }}">{{ sector[1] }}</a></td>
+                        <td>{{ "%.2f"|format(sector[2]) }}%</td>
+                        <td>{{ "%.2f"|format(sector[3]) }}%</td>
+                        <td>{{ "%.2f"|format(sector[4]) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            No sectors found{% if search_query %} matching "{{ search_query }}"{% endif %}.
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

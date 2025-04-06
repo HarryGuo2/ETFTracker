@@ -1,18 +1,57 @@
 {% extends "base.html" %}
 
+{% block title %}ETF Tracker - Home{% endblock %}
+
 {% block content %}
 <div class="jumbotron">
     <h1 class="display-4">Welcome to ETF Tracker</h1>
     <p class="lead">Explore ETFs, their components, and market sectors.</p>
     <hr class="my-4">
     <p>Browse through our database of ETFs and stocks to find investment opportunities.</p>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-info">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if session.user_id %}
+        <div class="alert alert-success">
+            <h4>Welcome back, {{ session.username }}!</h4>
+            <p>Manage your favorite ETFs or explore new investment opportunities.</p>
+            <div class="d-flex gap-2 mt-2">
+                <a href="{{ url_for('my_etfs') }}" class="btn btn-info">
+                    <i class="bi bi-star"></i> View My Favorite ETFs
+                </a>
+                <a href="{{ url_for('etf_recommendations') }}" class="btn btn-warning">
+                    <i class="bi bi-lightbulb"></i> Get ETF Recommendations
+                </a>
+            </div>
+        </div>
+    {% else %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Get Started</h4>
+            </div>
+            <div class="card-body">
+                <p>Create an account to track your favorite ETFs and get personalized recommendations.</p>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('login') }}" class="btn btn-primary">Login</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-outline-primary">Register</a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
     <div class="row mt-4">
         <div class="col-md-6">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Explore ETFs</h5>
                     <p class="card-text">View all available ETFs, their fund families, and sector allocations.</p>
-                    <a href="/etfs" class="btn btn-primary">View ETFs</a>
+                    <a href="{{ url_for('list_etfs') }}" class="btn btn-primary">View ETFs</a>
                 </div>
             </div>
         </div>
@@ -21,7 +60,28 @@
                 <div class="card-body">
                     <h5 class="card-title">Browse Stocks</h5>
                     <p class="card-text">Discover individual stocks and see which ETFs hold them.</p>
-                    <a href="/stocks" class="btn btn-primary">View Stocks</a>
+                    <a href="{{ url_for('list_stocks') }}" class="btn btn-primary">View Stocks</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Analyze Sectors</h5>
+                    <p class="card-text">Explore market sectors, their performance metrics, and related ETFs.</p>
+                    <a href="{{ url_for('list_sectors') }}" class="btn btn-primary">View Sectors</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Track Market Indexes</h5>
+                    <p class="card-text">Monitor major market indexes and the ETFs that track them.</p>
+                    <a href="{{ url_for('list_indexes') }}" class="btn btn-primary">View Indexes</a>
                 </div>
             </div>
         </div>

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}My Favorite ETFs{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">My Favorite ETFs</h1>
+    
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-info">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    {% if etfs %}
+        <div class="mb-4">
+            <a href="{{ url_for('etf_recommendations') }}" class="btn btn-info">
+                <i class="bi bi-lightbulb"></i> Get Personalized ETF Recommendations
+            </a>
+            <small class="text-muted d-block mt-2">Based on the sector composition of your favorite ETFs</small>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Name</th>
+                        <th>Inception Date</th>
+                        <th>AUM</th>
+                        <th>Fund Family</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for etf in etfs %}
+                    <tr>
+                        <td><a href="{{ url_for('etf_details', etf_ticker=etf[0]) }}">{{ etf[0] }}</a></td>
+                        <td>{{ etf[1] }}</td>
+                        <td>{{ etf[2] }}</td>
+                        <td>${{ etf[3] | default('N/A', true) }}</td>
+                        <td>{{ etf[4] }}</td>
+                        <td>
+                            <form action="{{ url_for('unlike_etf', etf_ticker=etf[0]) }}" method="post">
+                                <button type="submit" class="btn btn-sm btn-danger">Remove from Favorites</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <p>You haven't added any ETFs to your favorites yet.</p>
+            <a href="{{ url_for('list_etfs') }}" class="btn btn-primary mt-2">Browse ETFs</a>
+        </div>
+    {% endif %}
+    
+    <div class="mt-4">
+        <a href="{{ url_for('list_etfs') }}" class="btn btn-primary">View All ETFs</a>
+    </div>
+</div>
+{% endblock %} 

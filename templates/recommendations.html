@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Recommended ETFs{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">ETF Recommendations</h1>
+    
+    {% if liked_etfs %}
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Based on your favorite ETFs</h4>
+            </div>
+            <div class="card-body">
+                <p>We've analyzed the sectors of ETFs you like and found similar ones you might be interested in.</p>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    {% for etf in liked_etfs %}
+                        <span class="badge bg-primary p-2">{{ etf[0] }} - {{ etf[1] }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    
+        {% if recommendations %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ETF</th>
+                            <th>Name</th>
+                            <th>Similarity Score</th>
+                            <th>Based On</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in recommendations %}
+                        <tr>
+                            <td>{{ rec[1] }}</td>
+                            <td>{{ rec[2] }}</td>
+                            <td>
+                                <div class="progress">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: {{ (rec[3] / 5) * 100 }}%;" 
+                                         aria-valuenow="{{ rec[3] }}" aria-valuemin="0" aria-valuemax="5">
+                                        {{ rec[3] }}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ rec[0] }}</td>
+                            <td>
+                                <a href="{{ url_for('etf_details', etf_ticker=rec[1]) }}" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-info-circle"></i> View
+                                </a>
+                                {% if session.user_id %}
+                                <form action="{{ url_for('like_etf', etf_ticker=rec[1]) }}" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-heart"></i> Add to Favorites
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                We couldn't find any recommendations based on your favorites. Try adding more ETFs to your favorites!
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="alert alert-info">
+            <h4>You haven't added any ETFs to your favorites yet</h4>
+            <p>Start by exploring our ETF listings and add some to your favorites for personalized recommendations.</p>
+            <a href="{{ url_for('list_etfs') }}" class="btn btn-primary mt-2">Browse ETFs</a>
+        </div>
+    {% endif %}
+    
+    <div class="mt-4">
+        <a href="{{ url_for('my_etfs') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to My ETFs
+        </a>
+    </div>
+</div>
+{% endblock %} 

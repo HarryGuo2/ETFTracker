@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Market Indexes{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Market Indexes</h1>
+    
+    <!-- Search Form -->
+    <form class="mb-4" method="get" action="{{ url_for('list_indexes') }}">
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="Search indexes..." name="q" value="{{ search_query }}">
+            <button class="btn btn-primary" type="submit">
+                <i class="bi bi-search"></i> Search
+            </button>
+            {% if search_query %}
+            <a href="{{ url_for('list_indexes') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-x-circle"></i> Clear
+            </a>
+            {% endif %}
+        </div>
+    </form>
+    
+    {% if indexes %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Name</th>
+                        <th>Contributors</th>
+                        <th>Launch Date</th>
+                        <th>Base Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for index in indexes %}
+                    <tr>
+                        <td>{{ index[0] }}</td>
+                        <td><a href="{{ url_for('index_details', index_ticker=index[0]) }}">{{ index[1] }}</a></td>
+                        <td>{{ index[2] }}</td>
+                        <td>{{ index[3] }}</td>
+                        <td>${{ "%.2f"|format(index[4]) if index[4] else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            No indexes found{% if search_query %} matching "{{ search_query }}"{% endif %}.
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 
