@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="jumbotron">
+    <h1 class="display-4">Welcome to ETF Tracker</h1>
+    <p class="lead">Explore ETFs, their components, and market sectors.</p>
+    <hr class="my-4">
+    <p>Browse through our database of ETFs and stocks to find investment opportunities.</p>
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Explore ETFs</h5>
+                    <p class="card-text">View all available ETFs, their fund families, and sector allocations.</p>
+                    <a href="/etfs" class="btn btn-primary">View ETFs</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Browse Stocks</h5>
+                    <p class="card-text">Discover individual stocks and see which ETFs hold them.</p>
+                    <a href="/stocks" class="btn btn-primary">View Stocks</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

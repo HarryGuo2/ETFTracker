@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">ETFs</h1>
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Ticker</th>
+                <th>Name</th>
+                <th>Fund Family</th>
+                <th>Description</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for etf in etfs %}
+            <tr>
+                <td>{{ etf[1] }}</td>
+                <td>{{ etf[2] }}</td>
+                <td>{{ etf[4] }}</td>
+                <td>{{ etf[3] }}</td>
+                <td>
+                    <a href="/etf/{{ etf[0] }}" class="btn btn-sm btn-primary">View Details</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %} 

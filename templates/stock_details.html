@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <h1>{{ stock[2] }} ({{ stock[1] }})</h1>
+        <p class="lead">{{ stock[3] }}</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h3>ETFs Holding This Stock</h3>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Name</th>
+                        <th>Weight</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for etf in etfs %}
+                    <tr>
+                        <td>{{ etf[0] }}</td>
+                        <td>{{ etf[1] }}</td>
+                        <td>{{ "%.2f"|format(etf[2]) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="/stocks" class="btn btn-secondary">Back to Stocks</a>
+</div>
+{% endblock %} 
