@@ -2,6 +2,8 @@
 
 A web application for tracking and analyzing ETFs (Exchange Traded Funds) and their underlying stocks.
 
+> We want to make it easy for users to invest in ETFs.
+
 ## Features
 
 - Browse a list of ETFs with their details (ticker, name, inception date, AUM)
@@ -33,7 +35,7 @@ The application uses the following database tables:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/ETFTracker.git
+   git clone https://github.com/HarryGuo2/ETFTracker.git
    cd ETFTracker
    ```
 
@@ -61,4 +63,4 @@ The application uses the following database tables:
 - User authentication and personalized watchlists
 - Historical performance tracking
 - Visualization of ETF compositions
-- Comparison tools between multiple ETFs 
+- Comparison tools between multiple ETFs
