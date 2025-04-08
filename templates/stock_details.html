@@ -1,40 +1,72 @@
 {% extends "base.html" %}
 
-{% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <h1>{{ stock[2] }} ({{ stock[1] }})</h1>
-        <p class="lead">{{ stock[3] }}</p>
-    </div>
-</div>
+{% block title %}{{ stock[1] }} - Stock Details{% endblock %}
 
-<div class="row mt-4">
-    <div class="col-md-12">
-        <h3>ETFs Holding This Stock</h3>
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Ticker</th>
-                        <th>Name</th>
-                        <th>Weight</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for etf in etfs %}
-                    <tr>
-                        <td>{{ etf[0] }}</td>
-                        <td>{{ etf[1] }}</td>
-                        <td>{{ "%.2f"|format(etf[2]) }}%</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <h1>{{ stock[1] }} ({{ stock[0] }})</h1>
+            
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Sector:</strong> 
+                                {% if stock[4] %}
+                                    <a href="{{ url_for('sector_details', sector_id=stock[3]) }}">{{ stock[4] }}</a>
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </p>
+                            <p><strong>IPO Date:</strong> 
+                                {% if stock[2] %}
+                                    {{ stock[2].strftime('%B %d, %Y') }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-</div>
 
-<div class="mt-4">
-    <a href="/stocks" class="btn btn-secondary">Back to Stocks</a>
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3>ETFs Holding This Stock</h3>
+            {% if etfs %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Name</th>
+                                <th>Weight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for etf in etfs %}
+                            <tr>
+                                <td><a href="{{ url_for('etf_details', etf_ticker=etf[0]) }}">{{ etf[0] }}</a></td>
+                                <td>{{ etf[1] }}</td>
+                                <td>{{ "%.2f"|format(etf[2]) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">No ETFs found holding this stock.</div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('list_stocks') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Stocks
+        </a>
+    </div>
 </div>
 {% endblock %} 

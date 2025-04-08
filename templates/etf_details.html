@@ -3,81 +3,119 @@
 {% block title %}{{ etf[1] }} - ETF Details{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <h1>{{ etf[1] }} ({{ etf[0] }})</h1>
-        <p class="lead">{{ etf[2] }}</p>
-        <p><strong>Fund Family:</strong> {{ etf[5] }}</p>
-        
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-info">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
-        {% if session.user_id %}
-            {% if is_liked %}
-                <form action="{{ url_for('unlike_etf', etf_ticker=etf[0]) }}" method="post" class="mb-2">
-                    <button type="submit" class="btn btn-outline-danger">
-                        <i class="bi bi-heart-fill"></i> Remove from Favorites
-                    </button>
-                </form>
-            {% else %}
-                <form action="{{ url_for('like_etf', etf_ticker=etf[0]) }}" method="post" class="mb-2">
-                    <button type="submit" class="btn btn-outline-primary">
-                        <i class="bi bi-heart"></i> Add to Favorites
-                    </button>
-                </form>
-            {% endif %}
-        {% else %}
-            <div class="alert alert-info mb-3">
-                <a href="{{ url_for('login') }}">Login</a> to add this ETF to your favorites.
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <h1>{{ etf[1] }} ({{ etf[0] }})</h1>
+            
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Fund Family:</strong> {{ etf[6] or 'N/A' }}</p>
+                            <p><strong>Inception Date:</strong> 
+                                {% if etf[2] %}
+                                    {{ etf[2].strftime('%B %d, %Y') }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </p>
+                            <p><strong>AUM:</strong> 
+                                {% if etf[3] %}
+                                    ${{ "{:,.2f}".format(etf[3]) }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </p>
+                            <p><strong>Management Fee:</strong> 
+                                {% if etf[4] %}
+                                    {{ "%.2f"|format(etf[4]) }}%
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </p>
+                            <p><strong>Number of Stocks:</strong> {{ etf[5] or 'N/A' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Categories:</strong></p>
+                            {% if categories %}
+                                <div class="d-flex flex-wrap gap-2">
+                                    {% for category in categories %}
+                                        <span class="badge bg-primary">{{ category[0] }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p>N/A</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
-        {% endif %}
-        
-        <a href="{{ url_for('etf_specific_recommendations', etf_ticker=etf[0]) }}" class="btn btn-info">
-            <i class="bi bi-lightbulb"></i> Find Similar ETFs
-        </a>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-md-6">
-        <h3>Sectors</h3>
-        <ul class="list-group">
-            {% for sector in sectors %}
-            <li class="list-group-item">{{ sector[0] }}</li>
-            {% endfor %}
-        </ul>
-    </div>
-    <div class="col-md-6">
-        <h3>Top Holdings</h3>
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Ticker</th>
-                        <th>Name</th>
-                        <th>Weight</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for stock in stocks %}
-                    <tr>
-                        <td><a href="{{ url_for('stock_details', stock_ticker=stock[0]) }}">{{ stock[0] }}</a></td>
-                        <td>{{ stock[1] }}</td>
-                        <td>{{ "%.2f"|format(stock[2]) }}%</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
         </div>
     </div>
-</div>
 
-<div class="mt-4">
-    <a href="{{ url_for('list_etfs') }}" class="btn btn-secondary">Back to ETFs</a>
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <h3>Sector Allocation</h3>
+            {% if sectors %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Sector</th>
+                                <th>Weight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sector in sectors %}
+                            <tr>
+                                <td>{{ sector[0] }}</td>
+                                <td>{{ "%.2f"|format(sector[1]) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">No sector information available.</div>
+            {% endif %}
+        </div>
+        
+        <div class="col-md-6">
+            <h3>Top Holdings</h3>
+            {% if stocks %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Stock</th>
+                                <th>Weight</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stock in stocks %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('stock_details', stock_ticker=stock[0]) }}">
+                                        {{ stock[1] }} ({{ stock[0] }})
+                                    </a>
+                                </td>
+                                <td>{{ "%.2f"|format(stock[2]) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">No stock holdings information available.</div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('list_etfs') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to ETFs
+        </a>
+    </div>
 </div>
 {% endblock %} 

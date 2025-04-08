@@ -41,7 +41,7 @@
                         <td>{{ etf[1] }}</td>
                         <td>{{ etf[2] }}</td>
                         <td>${{ etf[3] | default('N/A', true) }}</td>
-                        <td>{{ etf[4] }}</td>
+                        <td>{{ etf[4] | default('N/A', true) }}</td>
                         <td>
                             <a href="{{ url_for('etf_details', etf_ticker=etf[0]) }}" class="btn btn-sm btn-primary">
                                 <i class="bi bi-info-circle"></i> View Details

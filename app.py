@@ -25,6 +25,20 @@ DB_SCHEMA = "hg2736"
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
 
+def format_currency(value):
+    """Format a number as currency with appropriate suffix (B for billions, M for millions)"""
+    if value is None:
+        return 'N/A'
+    if value >= 1_000_000_000:
+        return f"${value/1_000_000_000:.2f}B"
+    elif value >= 1_000_000:
+        return f"${value/1_000_000:.2f}M"
+    else:
+        return f"${value:,.2f}"
+
+# Make the function available in templates
+app.jinja_env.filters['format_currency'] = format_currency
+
 def get_db_connection():
     conn = psycopg2.connect(
         host=DB_HOST,
@@ -91,20 +105,20 @@ def list_etfs():
         if search_query:
             # If search query provided, filter results
             cur.execute("""
-                SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name as fund_family
+                SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name
                 FROM ETF e
-                JOIN Fund_has_ETF fe ON e.etf_ticker = fe.etf_ticker
-                JOIN Fund_Family f ON fe.fund_id = f.fund_id
+                LEFT JOIN fund_has_etf fe ON e.etf_ticker = fe.etf_ticker
+                LEFT JOIN fund_family f ON fe.fund_id = f.fund_id
                 WHERE e.etf_ticker ILIKE %s OR e.etf_name ILIKE %s
                 ORDER BY e.etf_ticker
             """, ('%' + search_query + '%', '%' + search_query + '%'))
         else:
             # If no search query, return all
             cur.execute("""
-                SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name as fund_family
+                SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name
                 FROM ETF e
-                JOIN Fund_has_ETF fe ON e.etf_ticker = fe.etf_ticker
-                JOIN Fund_Family f ON fe.fund_id = f.fund_id
+                LEFT JOIN fund_has_etf fe ON e.etf_ticker = fe.etf_ticker
+                LEFT JOIN fund_family f ON fe.fund_id = f.fund_id
                 ORDER BY e.etf_ticker
             """)
             
@@ -123,20 +137,30 @@ def etf_details(etf_ticker):
         
         # Get ETF basic info
         cur.execute("""
-            SELECT e.*, f.fund_name as fund_family
+            SELECT e.*, f.fund_name
             FROM ETF e
-            JOIN Fund_has_ETF fe ON e.etf_ticker = fe.etf_ticker
-            JOIN Fund_Family f ON fe.fund_id = f.fund_id
+            LEFT JOIN fund_has_etf fe ON e.etf_ticker = fe.etf_ticker
+            LEFT JOIN fund_family f ON fe.fund_id = f.fund_id
             WHERE e.etf_ticker = %s
         """, (etf_ticker,))
         etf = cur.fetchone()
         
-        # Get sectors
+        # Get ETF categories
         cur.execute("""
-            SELECT s.sector_name
+            SELECT category_name
+            FROM etf_category
+            WHERE etf_ticker = %s
+            ORDER BY category_name
+        """, (etf_ticker,))
+        categories = cur.fetchall()
+        
+        # Get sectors with weights
+        cur.execute("""
+            SELECT s.sector_name, es.sector_weight
             FROM ETF_has_Sector es
             JOIN Sector s ON es.sector_id = s.sector_id
             WHERE es.etf_ticker = %s
+            ORDER BY es.sector_weight DESC
         """, (etf_ticker,))
         sectors = cur.fetchall()
         
@@ -161,7 +185,7 @@ def etf_details(etf_ticker):
         
         cur.close()
         conn.close()
-        return render_template('etf_details.html', etf=etf, sectors=sectors, stocks=stocks, is_liked=is_liked)
+        return render_template('etf_details.html', etf=etf, categories=categories, sectors=sectors, stocks=stocks, is_liked=is_liked)
     except Exception as e:
         return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
 
@@ -177,16 +201,18 @@ def list_stocks():
         if search_query:
             # If search query provided, filter results
             cur.execute("""
-                SELECT s.stock_ticker, s.stock_name, s.ipo_date, s.stock_sector
+                SELECT s.stock_ticker, s.stock_name, s.ipo_date, s.stock_sector, sec.sector_name
                 FROM Stock s
+                LEFT JOIN Sector sec ON s.stock_sector = sec.sector_id
                 WHERE s.stock_ticker ILIKE %s OR s.stock_name ILIKE %s
                 ORDER BY s.stock_ticker
             """, ('%' + search_query + '%', '%' + search_query + '%'))
         else:
             # If no search query, return all
             cur.execute("""
-                SELECT s.stock_ticker, s.stock_name, s.ipo_date, s.stock_sector
+                SELECT s.stock_ticker, s.stock_name, s.ipo_date, s.stock_sector, sec.sector_name
                 FROM Stock s
+                LEFT JOIN Sector sec ON s.stock_sector = sec.sector_id
                 ORDER BY s.stock_ticker
             """)
             
@@ -203,11 +229,12 @@ def stock_details(stock_ticker):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Get stock basic info
+        # Get stock basic info with sector name
         cur.execute("""
-            SELECT *
-            FROM Stock
-            WHERE stock_ticker = %s
+            SELECT s.*, sec.sector_name
+            FROM Stock s
+            LEFT JOIN Sector sec ON s.stock_sector = sec.sector_id
+            WHERE s.stock_ticker = %s
         """, (stock_ticker,))
         stock = cur.fetchone()
         
@@ -461,9 +488,18 @@ def sector_details(sector_id):
         """, (sector_id,))
         etfs = cur.fetchall()
         
+        # Get stocks in this sector
+        cur.execute("""
+            SELECT stock_ticker, stock_name, ipo_date
+            FROM Stock
+            WHERE stock_sector = %s
+            ORDER BY stock_ticker
+        """, (sector_id,))
+        stocks = cur.fetchall()
+        
         cur.close()
         conn.close()
-        return render_template('sector_details.html', sector=sector, etfs=etfs)
+        return render_template('sector_details.html', sector=sector, etfs=etfs, stocks=stocks)
     except Exception as e:
         return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
 

@@ -39,7 +39,7 @@
     
     <div class="row mt-4">
         <div class="col-12">
-            <h3>ETFs in this Sector</h3>
+            <h3>ETFs related to the Sector</h3>
             {% if etfs %}
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
@@ -63,6 +63,36 @@
                 </div>
             {% else %}
                 <div class="alert alert-info">No ETFs found in this sector.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3>Stocks in the Sector</h3>
+            {% if stocks %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Name</th>
+                                <th>IPO Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stock in stocks %}
+                            <tr>
+                                <td><a href="{{ url_for('stock_details', stock_ticker=stock[0]) }}">{{ stock[0] }}</a></td>
+                                <td>{{ stock[1] }}</td>
+                                <td>{{ stock[2] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">No stocks found in this sector.</div>
             {% endif %}
         </div>
     </div>

@@ -90,11 +90,6 @@
     </div>
     {% endif %}
     
-    {% if not etfs or etfs|length == 0 and not stocks or stocks|length == 0 %}
-    <div class="alert alert-info mt-4">
-        No ETFs or stocks found for this index.
-    </div>
-    {% endif %}
     
     <div class="mt-4">
         <a href="{{ url_for('list_indexes') }}" class="btn btn-secondary">
