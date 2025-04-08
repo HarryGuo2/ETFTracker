@@ -1,88 +1,141 @@
-# ETF Tracker
+# ETF Tracker Application - Project Part 3 Submission
 
-A web application for tracking and analyzing ETFs (Exchange Traded Funds) and their underlying stocks.
+## Database Information
+- **PostgreSQL Account:** hg2736
+- **Server:** 34.148.223.31:5432
+- **Database Name:** proj1part2
+- **Schema:** hg2736
 
-> We want to make it easy for users to invest in ETFs.
+This is the same database that was used for Part 2.
 
-## Features
+## Application URL
+The ETF Tracker application is deployed and available at:
+- **URL:** http://34.23.64.195:8111/
 
-- User authentication system with login and registration
-- Personalized ETF watchlist ("My Favorite ETFs")
-- Browse and search ETFs, stocks, sectors, and market indexes
-- View detailed information about each ETF including:
-  - Fund family information
-  - Sector allocations
-  - Top stock holdings with weights
-- View detailed information about each stock including ETFs that hold it
-- View sector performance metrics and associated ETFs
-- View market indexes and their tracking ETFs
-- Search functionality on all listing pages
+The virtual machine will remain running throughout the evaluation period to ensure the URL remains accessible.
 
-## Technology Stack
+## Deployment Details
+The application is deployed on Google Cloud Platform using the following setup:
 
-- **Backend**: Flask (Python)
-- **Database**: PostgreSQL
-- **Frontend**: HTML, CSS, Bootstrap (rendered with Flask templates)
+### Running with Screen
+To ensure the application runs continuously even after SSH disconnection, we use the `screen` utility:
 
-## Database Schema
+```bash
+# Install screen (if not already installed)
+sudo apt-get install screen
 
-The application uses the following database tables:
-- `ETF`: Information about ETFs (ticker, name, inception date, etc.)
-- `Stock`: Information about individual stocks
-- `Fund_Family`: Information about fund providers
-- `Fund_has_ETF`: Relationship between fund families and ETFs
-- `Sector`: Market sectors information
-- `ETF_has_Sector`: ETF allocations by sector
-- `Stock_in_ETF`: Stock holdings in each ETF with weights
-- `Index_Table`: Market indexes information
-- `ETF_tracks_Index`: Relationship between ETFs and the indexes they track
-- `Users`: User authentication information
-- `User_Likes_ETF`: Tracks which ETFs a user has added to their favorites
+# Start a new screen session
+screen
 
-## Setup
+# Navigate to application directory
+cd ~/etf-tracker/ETFTracker
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/HarryGuo2/ETFTracker.git
-   cd ETFTracker
-   ```
+# Activate virtual environment
+source ~/etf-tracker/venv/bin/activate
 
-2. Install required packages:
-   ```
-   pip install -r requirements.txt
-   ```
+# Run the Flask application
+python3 app.py
 
-3. Set up environment variables:
-   - Create a `.env` file in the project root with your database credentials
+# Detach from screen (Ctrl+A, then D)
+# This keeps the application running in the background
+```
 
-4. Create the user database tables:
-   ```
-   python fix_user_tables.py
-   ```
+To reconnect to the running application:
+```bash
+screen -r
+```
 
-5. Run the application:
-   ```
-   python app.py
-   ```
+### Database Connection
+The application connects to the PostgreSQL database with the following configuration:
+```python
+DB_HOST = "34.148.223.31"
+DB_PORT = "5432"
+DB_NAME = "proj1part2"
+DB_USER = "hg2736"
+DB_SCHEMA = "hg2736"
+```
 
-6. Access the application at `http://localhost:8111`
+## Implementation of Original Proposal
 
-## User Flow
+### Features Implemented (as proposed in Part 1)
+1. **Core Data Browsing and Visualization:**
+   - Browse ETFs, stocks, sectors, and market indices
+   - View detailed information about each entity
+   - Explore relationships between entities (e.g., ETFs holding specific stocks)
+   - Search functionality for all entity types
 
-1. Register for an account or login
-2. Browse the available ETFs, stocks, sectors, or indexes
-3. Use the search functionality to find specific items
-4. View detailed information about ETFs that interest you
-5. Add ETFs to your favorites by clicking the "Add to Favorites" button
-6. Access your personalized ETF watchlist from "My Favorite ETFs" in the navigation
+2. **User Authentication System:**
+   - User registration and login
+   - Password hashing for security
+   - Session management
 
-## Screenshots
+3. **Personalization Features:**
+   - Add/remove ETFs to/from user favorites
+   - View list of favorite ETFs with detailed information
+   - Personalized dashboard for logged-in users
 
-*[Add screenshots here]*
+4. **ETF Recommendation System:**
+   - Sector-based similarity algorithm
+   - Personalized recommendations based on user's liked ETFs
+   - Single ETF similarity recommendations
+   - Visualization of similarity scores
 
-## Future Enhancements
+### Additional Features (not in original proposal)
+1. **Enhanced UI/UX:**
+   - Modern Bootstrap-based responsive design
+   - Improved navigation and user flow
+   - Mobile-friendly layout
+   - Icons and visual cues for better user experience
 
-- User authentication and personalized watchlists
-- Historical performance tracking
-- Visualization of ETF compositions
-- Comparison tools between multiple ETFs
+2. **ETF Categories:**
+   - Added ETF category information
+   - Visual display of categories as badges
+   - Improved data representation
+
+3. **Data Formatting and Display:**
+   - Better date formatting
+   - Currency formatting with appropriate suffixes (B, M)
+   - Handling of null values throughout the application
+   - Progress bars for visualizing weights and similarities
+
+4. **Cloud Deployment:**
+   - Deployed on Google Cloud Platform
+   - Configured for continuous operation
+
+### Features Not Implemented
+All features from the original proposal were successfully implemented. The only minor modification was to focus the recommendation system on sector-based similarity rather than implementing multiple recommendation algorithms, as this proved to be the most relevant approach for ETF comparisons.
+
+## Most Interesting Database Operations
+
+### 1. ETF Recommendation Page
+**URL:** http://34.23.64.195:8111/recommendations
+
+This page generates personalized ETF recommendations based on the ETFs a user has liked. It involves complex database operations:
+
+- **Database Operations:** 
+  - Retrieves all ETFs liked by the current user
+  - For each liked ETF, identifies its sectors
+  - Finds other ETFs that share these sectors
+  - Counts the number of common sectors between ETFs
+  - Ranks ETFs by similarity score
+  - Deduplicates recommendations across multiple source ETFs
+  - Returns a unique set of top recommendations
+
+- **Why It's Interesting:**
+  This operation involves multiple joins, aggregations, and a sophisticated ranking algorithm. It demonstrates how to leverage existing data relationships (ETF-sector) to create value-added features without requiring additional data collection. The query uses Common Table Expressions (CTEs) to break down the complex logic into manageable components, making it both performant and maintainable.
+
+### 2. Stock Details Page
+**URL:** http://34.23.64.195:8111/stock/AAPL (example)
+
+This page shows comprehensive information about a stock and its relationships within the investment ecosystem:
+
+- **Database Operations:**
+  - Retrieves basic stock information with a join to the Sector table to get sector names
+  - Finds all ETFs that hold the stock along with the weight of the stock in each ETF
+  - Combines data from multiple tables (Stock, Sector, Stock_in_ETF, ETF)
+  - Orders results by stock weight to show the ETFs where this stock has the most impact
+
+- **Why It's Interesting:**
+  This page demonstrates how relational databases excel at showing interconnections between entities. With just a few joins, we can show investors not only information about a stock but also how it's represented across various ETFs. This helps users understand both direct investment options (the stock itself) and indirect options (ETFs containing the stock at various weights). The ordering by weight provides additional analytical value by highlighting where the stock has the most significant presence.
+
+Both these operations showcase how well-designed database schemas can support complex analytical features that provide genuine value to users, going beyond simple CRUD operations to deliver insights based on relationships within the data.
