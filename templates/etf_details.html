@@ -51,6 +51,40 @@
                     </div>
                 </div>
             </div>
+            
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-info">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <div class="d-flex gap-2 mb-4">
+                {% if session.user_id %}
+                    {% if is_liked %}
+                        <form action="{{ url_for('unlike_etf', etf_ticker=etf[0]) }}" method="post">
+                            <button type="submit" class="btn btn-outline-danger">
+                                <i class="bi bi-heart-fill"></i> Remove from Favorites
+                            </button>
+                        </form>
+                    {% else %}
+                        <form action="{{ url_for('like_etf', etf_ticker=etf[0]) }}" method="post">
+                            <button type="submit" class="btn btn-outline-primary">
+                                <i class="bi bi-heart"></i> Add to Favorites
+                            </button>
+                        </form>
+                    {% endif %}
+                {% else %}
+                    <div class="alert alert-info">
+                        <a href="{{ url_for('login') }}">Login</a> to add this ETF to your favorites.
+                    </div>
+                {% endif %}
+                
+                <a href="{{ url_for('etf_specific_recommendations', etf_ticker=etf[0]) }}" class="btn btn-info">
+                    <i class="bi bi-lightbulb"></i> Find Similar ETFs
+                </a>
+            </div>
         </div>
     </div>
 
