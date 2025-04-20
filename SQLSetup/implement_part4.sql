@@ -11,8 +11,13 @@ CREATE TYPE etf_performance AS (
 );
 
 -- 2. Create a table using the composite type
-CREATE TABLE etf_performance_metrics OF etf_performance (
-    etf_ticker VARCHAR(10) PRIMARY KEY
+CREATE TABLE etf_performance_metrics (
+    etf_ticker VARCHAR(10) PRIMARY KEY,
+    volatility DECIMAL,
+    sharpe_ratio DECIMAL,
+    max_drawdown DECIMAL,
+    inception_date DATE,
+    last_updated TIMESTAMP
 );
 
 -- 3. Create a function to calculate performance metrics
