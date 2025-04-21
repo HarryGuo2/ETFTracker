@@ -139,3 +139,17 @@ This page shows comprehensive information about a stock and its relationships wi
   This page demonstrates how relational databases excel at showing interconnections between entities. With just a few joins, we can show investors not only information about a stock but also how it's represented across various ETFs. This helps users understand both direct investment options (the stock itself) and indirect options (ETFs containing the stock at various weights). The ordering by weight provides additional analytical value by highlighting where the stock has the most significant presence.
 
 Both these operations showcase how well-designed database schemas can support complex analytical features that provide genuine value to users, going beyond simple CRUD operations to deliver insights based on relationships within the data.
+
+## Features
+
+### Comment System
+- Users can post comments on ETF pages
+- Comments are displayed with username and timestamp
+- Comment count is automatically tracked and displayed for each ETF
+- Real-time comment count updates using database triggers
+- Comment moderation and user authentication
+
+### Database Features
+- Automatic comment count tracking using PostgreSQL triggers
+- Trigger function `update_comment_count()` increments comment count on new comments
+- Comment count is stored in the ETF table and displayed in the UI

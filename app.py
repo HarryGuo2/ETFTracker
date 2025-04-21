@@ -103,19 +103,60 @@ def list_etfs():
         search_query = request.args.get('q', '')
         
         if search_query:
-            # If search query provided, filter results
+            # Format the search query for tsquery
+            # Replace spaces with & to make it an AND search
+            formatted_query = ' & '.join(search_query.split())
+            
+            # Full-text search with ranking across all ETF-related information
             cur.execute("""
-                SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name
-                FROM ETF e
-                LEFT JOIN fund_has_etf fe ON e.etf_ticker = fe.etf_ticker
-                LEFT JOIN fund_family f ON fe.fund_id = f.fund_id
-                WHERE e.etf_ticker ILIKE %s OR e.etf_name ILIKE %s
-                ORDER BY e.etf_ticker
-            """, ('%' + search_query + '%', '%' + search_query + '%'))
+                WITH search_results AS (
+                    SELECT 
+                        e.etf_ticker,
+                        e.etf_name,
+                        e.inception_date,
+                        e.aum,
+                        f.fund_name,
+                        ts_rank_cd(
+                            setweight(to_tsvector('english', COALESCE(e.etf_name, '')), 'A') ||
+                            setweight(to_tsvector('english', COALESCE(e.etf_review, '')), 'B') ||
+                            setweight(to_tsvector('english', COALESCE(f.fund_name, '')), 'C') ||
+                            setweight(to_tsvector('english', COALESCE(string_agg(DISTINCT s.sector_name, ' '), '')), 'D') ||
+                            setweight(to_tsvector('english', COALESCE(string_agg(DISTINCT st.stock_name, ' '), '')), 'D') ||
+                            setweight(to_tsvector('english', COALESCE(string_agg(DISTINCT ec.comment_text, ' '), '')), 'D') ||
+                            setweight(to_tsvector('english', COALESCE(string_agg(DISTINCT cat.category_name, ' '), '')), 'D'),
+                            to_tsquery('english', %s)
+                        ) as rank
+                    FROM ETF e
+                    LEFT JOIN fund_has_etf fe ON e.etf_ticker = fe.etf_ticker
+                    LEFT JOIN fund_family f ON fe.fund_id = f.fund_id
+                    LEFT JOIN ETF_has_Sector es ON e.etf_ticker = es.etf_ticker
+                    LEFT JOIN Sector s ON es.sector_id = s.sector_id
+                    LEFT JOIN Stock_in_ETF sie ON e.etf_ticker = sie.etf_ticker
+                    LEFT JOIN Stock st ON sie.stock_ticker = st.stock_ticker
+                    LEFT JOIN ETF_Comments ec ON e.etf_ticker = ec.etf_ticker
+                    LEFT JOIN etf_category cat ON e.etf_ticker = cat.etf_ticker
+                    GROUP BY e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name
+                    HAVING 
+                        to_tsvector('english', COALESCE(e.etf_name, '')) @@ to_tsquery('english', %s) OR
+                        to_tsvector('english', COALESCE(e.etf_review, '')) @@ to_tsquery('english', %s) OR
+                        to_tsvector('english', COALESCE(f.fund_name, '')) @@ to_tsquery('english', %s) OR
+                        to_tsvector('english', COALESCE(string_agg(DISTINCT s.sector_name, ' '), '')) @@ to_tsquery('english', %s) OR
+                        to_tsvector('english', COALESCE(string_agg(DISTINCT st.stock_name, ' '), '')) @@ to_tsquery('english', %s) OR
+                        to_tsvector('english', COALESCE(string_agg(DISTINCT ec.comment_text, ' '), '')) @@ to_tsquery('english', %s) OR
+                        to_tsvector('english', COALESCE(string_agg(DISTINCT cat.category_name, ' '), '')) @@ to_tsquery('english', %s) OR
+                        e.etf_ticker ILIKE %s OR
+                        CAST(e.aum AS TEXT) ILIKE %s
+                )
+                SELECT etf_ticker, etf_name, inception_date, aum, fund_name
+                FROM search_results
+                ORDER BY rank DESC NULLS LAST, etf_ticker
+            """, (formatted_query, formatted_query, formatted_query, formatted_query, 
+                  formatted_query, formatted_query, formatted_query, formatted_query,
+                  '%' + search_query + '%', '%' + search_query + '%'))
         else:
             # If no search query, return all
             cur.execute("""
-                SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name
+                SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, f.fund_name, e.comment_count
                 FROM ETF e
                 LEFT JOIN fund_has_etf fe ON e.etf_ticker = fe.etf_ticker
                 LEFT JOIN fund_family f ON fe.fund_id = f.fund_id
@@ -137,7 +178,8 @@ def etf_details(etf_ticker):
         
         # Get ETF basic info
         cur.execute("""
-            SELECT e.*, f.fund_name
+            SELECT e.etf_ticker, e.etf_name, e.inception_date, e.aum, e.management_fee, 
+                   e.number_of_stocks, f.fund_name, e.etf_review, e.annual_returns, e.comment_count
             FROM ETF e
             LEFT JOIN fund_has_etf fe ON e.etf_ticker = fe.etf_ticker
             LEFT JOIN fund_family f ON fe.fund_id = f.fund_id
@@ -174,6 +216,21 @@ def etf_details(etf_ticker):
         """, (etf_ticker,))
         stocks = cur.fetchall()
         
+        # Get comments with usernames using the composite type
+        cur.execute("""
+            SELECT 
+                c.comment_id,
+                (c.comment).user_id,
+                (c.comment).comment_text,
+                (c.comment).comment_date,
+                u.username
+            FROM ETF_Comments c
+            LEFT JOIN users u ON (c.comment).user_id = u.user_id::text
+            WHERE c.etf_ticker = %s
+            ORDER BY (c.comment).comment_date DESC
+        """, (etf_ticker,))
+        comments = cur.fetchall()
+        
         # Check if user has liked this ETF
         is_liked = False
         if 'user_id' in session:
@@ -185,9 +242,50 @@ def etf_details(etf_ticker):
         
         cur.close()
         conn.close()
-        return render_template('etf_details.html', etf=etf, categories=categories, sectors=sectors, stocks=stocks, is_liked=is_liked)
+        
+        # Format annual returns if they exist
+        if etf and etf[8]:
+            annual_returns = [float(r) for r in etf[8]]
+        else:
+            annual_returns = None
+            
+        return render_template('etf_details.html', 
+                             etf=etf, 
+                             categories=categories, 
+                             sectors=sectors, 
+                             stocks=stocks, 
+                             is_liked=is_liked, 
+                             comments=comments,
+                             annual_returns=annual_returns)
     except Exception as e:
         return f"<h1>Error</h1><p>{str(e)}</p><pre>{traceback.format_exc()}</pre>"
+
+@app.route('/etf/<etf_ticker>/comment', methods=['POST'])
+@login_required
+def add_comment(etf_ticker):
+    try:
+        comment_text = request.form.get('comment_text')
+        if not comment_text:
+            flash('Comment cannot be empty')
+            return redirect(url_for('etf_details', etf_ticker=etf_ticker))
+            
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Insert comment using the composite type
+        cur.execute("""
+            INSERT INTO ETF_Comments (etf_ticker, comment)
+            VALUES (%s, ROW(%s, %s, CURRENT_TIMESTAMP)::comment_type)
+        """, (etf_ticker, str(session['user_id']), comment_text))
+        
+        cur.close()
+        conn.close()
+        
+        flash('Comment added successfully')
+        return redirect(url_for('etf_details', etf_ticker=etf_ticker))
+    except Exception as e:
+        flash('Error adding comment')
+        return redirect(url_for('etf_details', etf_ticker=etf_ticker))
 
 @app.route('/stocks')
 def list_stocks():

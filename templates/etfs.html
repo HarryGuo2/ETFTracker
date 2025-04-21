@@ -39,9 +39,10 @@
                     <tr>
                         <td>{{ etf[0] }}</td>
                         <td>{{ etf[1] }}</td>
-                        <td>{{ etf[2] }}</td>
-                        <td>${{ etf[3] | default('N/A', true) }}</td>
-                        <td>{{ etf[4] | default('N/A', true) }}</td>
+                        <td>{{ etf[2].strftime('%Y-%m-%d') if etf[2] else 'N/A' }}</td>
+                        <td>{{ etf[3]|format_currency if etf[3] else 'N/A' }}</td>
+                        <td>{{ etf[4] or 'N/A' }}</td>
+                        <td>{{ etf[5] or 0 }}</td>
                         <td>
                             <a href="{{ url_for('etf_details', etf_ticker=etf[0]) }}" class="btn btn-sm btn-primary">
                                 <i class="bi bi-info-circle"></i> View Details
